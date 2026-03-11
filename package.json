@@ -1,6 +1,6 @@
 {
   "name": "gsd-pi",
-  "version": "0.3.0",
+  "version": "2.3.4",
   "description": "GSD — Get Shit Done coding agent",
   "license": "MIT",
   "repository": {
@@ -18,6 +18,7 @@
   },
   "files": [
     "dist",
+    "patches",
     "pkg",
     "src/resources",
     "scripts/postinstall.js",
@@ -37,6 +38,8 @@
     "test": "node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs --experimental-strip-types --test 'src/resources/extensions/gsd/tests/*.test.ts' 'src/resources/extensions/gsd/tests/*.test.mjs' 'src/tests/*.test.ts'",
     "dev": "tsc --watch",
     "postinstall": "node scripts/postinstall.js",
+    "pi:install-global": "node scripts/install-pi-global.js",
+    "pi:uninstall-global": "node scripts/uninstall-pi-global.js",
     "sync-pkg-version": "node scripts/sync-pkg-version.cjs",
     "prepublishOnly": "npm run sync-pkg-version && npm run build"
   },
@@ -46,6 +49,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "patch-package": "^8.0.1",
     "typescript": "^5.4.0"
   },
   "overrides": {

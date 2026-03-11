@@ -1,18 +1,76 @@
 import {
   AuthStorage,
+  DefaultResourceLoader,
   ModelRegistry,
   SettingsManager,
   SessionManager,
   createAgentSession,
   InteractiveMode,
+  runPrintMode,
 } from '@mariozechner/pi-coding-agent'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { agentDir, sessionsDir, authFilePath } from './app-paths.js'
-import { buildResourceLoader, initResources } from './resource-loader.js'
+import { initResources } from './resource-loader.js'
+import { ensureManagedTools } from './tool-bootstrap.js'
 import { loadStoredEnvKeys, runWizardIfNeeded } from './wizard.js'
+
+// ---------------------------------------------------------------------------
+// Minimal CLI arg parser — detects print/subagent mode flags
+// ---------------------------------------------------------------------------
+interface CliFlags {
+  mode?: 'text' | 'json' | 'rpc'
+  print?: boolean
+  noSession?: boolean
+  model?: string
+  extensions: string[]
+  appendSystemPrompt?: string
+  tools?: string[]
+  messages: string[]
+}
+
+function parseCliArgs(argv: string[]): CliFlags {
+  const flags: CliFlags = { extensions: [], messages: [] }
+  const args = argv.slice(2) // skip node + script
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    if (arg === '--mode' && i + 1 < args.length) {
+      const m = args[++i]
+      if (m === 'text' || m === 'json' || m === 'rpc') flags.mode = m
+    } else if (arg === '--print' || arg === '-p') {
+      flags.print = true
+    } else if (arg === '--no-session') {
+      flags.noSession = true
+    } else if (arg === '--model' && i + 1 < args.length) {
+      flags.model = args[++i]
+    } else if (arg === '--extension' && i + 1 < args.length) {
+      flags.extensions.push(args[++i])
+    } else if (arg === '--append-system-prompt' && i + 1 < args.length) {
+      flags.appendSystemPrompt = args[++i]
+    } else if (arg === '--tools' && i + 1 < args.length) {
+      flags.tools = args[++i].split(',')
+    } else if (!arg.startsWith('--') && !arg.startsWith('-')) {
+      flags.messages.push(arg)
+    }
+  }
+  return flags
+}
+
+const cliFlags = parseCliArgs(process.argv)
+const isPrintMode = cliFlags.print || cliFlags.mode !== undefined
+
+// Pi's tool bootstrap can mis-detect already-installed fd/rg on some systems
+// because spawnSync(..., ["--version"]) returns EPERM despite a zero exit code.
+// Provision local managed binaries first so Pi sees them without probing PATH.
+ensureManagedTools(join(agentDir, 'bin'))
 
 const authStorage = AuthStorage.create(authFilePath)
 loadStoredEnvKeys(authStorage)
-await runWizardIfNeeded(authStorage)
+
+// Skip the setup wizard in print mode — it requires TTY interaction
+if (!isPrintMode) {
+  await runWizardIfNeeded(authStorage)
+}
 
 const modelRegistry = new ModelRegistry(authStorage)
 const settingsManager = SettingsManager.create(agentDir)
@@ -53,10 +111,79 @@ if (!settingsManager.getCollapseChangelog()) {
   settingsManager.setCollapseChangelog(true)
 }
 
-const sessionManager = SessionManager.create(process.cwd(), sessionsDir)
+// ---------------------------------------------------------------------------
+// Print / subagent mode — single-shot execution, no TTY required
+// ---------------------------------------------------------------------------
+if (isPrintMode) {
+  const sessionManager = cliFlags.noSession
+    ? SessionManager.inMemory()
+    : SessionManager.create(process.cwd())
+
+  // Read --append-system-prompt file content (subagent writes agent system prompts to temp files)
+  let appendSystemPrompt: string | undefined
+  if (cliFlags.appendSystemPrompt) {
+    try {
+      appendSystemPrompt = readFileSync(cliFlags.appendSystemPrompt, 'utf-8')
+    } catch {
+      // If it's not a file path, treat it as literal text
+      appendSystemPrompt = cliFlags.appendSystemPrompt
+    }
+  }
+
+  initResources(agentDir)
+  const resourceLoader = new DefaultResourceLoader({
+    agentDir,
+    additionalExtensionPaths: cliFlags.extensions.length > 0 ? cliFlags.extensions : undefined,
+    appendSystemPrompt,
+  })
+  await resourceLoader.reload()
+
+  const { session, extensionsResult } = await createAgentSession({
+    authStorage,
+    modelRegistry,
+    settingsManager,
+    sessionManager,
+    resourceLoader,
+  })
+
+  if (extensionsResult.errors.length > 0) {
+    for (const err of extensionsResult.errors) {
+      process.stderr.write(`[gsd] Extension load error: ${err.error}\n`)
+    }
+  }
+
+  // Apply --model override if specified
+  if (cliFlags.model) {
+    const available = modelRegistry.getAvailable()
+    const match =
+      available.find((m) => m.id === cliFlags.model) ||
+      available.find((m) => `${m.provider}/${m.id}` === cliFlags.model)
+    if (match) {
+      session.setModel(match)
+    }
+  }
+
+  const mode = cliFlags.mode || 'text'
+  await runPrintMode(session, {
+    mode: mode === 'rpc' ? 'json' : mode,
+    messages: cliFlags.messages,
+  })
+  process.exit(0)
+}
+
+// ---------------------------------------------------------------------------
+// Interactive mode — normal TTY session
+// ---------------------------------------------------------------------------
+
+// Per-directory session storage — same encoding as the upstream SDK so that
+// /resume only shows sessions from the current working directory.
+const cwd = process.cwd()
+const safePath = `--${cwd.replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')}--`
+const projectSessionsDir = join(sessionsDir, safePath)
+const sessionManager = SessionManager.create(cwd, projectSessionsDir)
 
 initResources(agentDir)
-const resourceLoader = buildResourceLoader(agentDir)
+const resourceLoader = new DefaultResourceLoader({ agentDir })
 await resourceLoader.reload()
 
 const { session, extensionsResult } = await createAgentSession({

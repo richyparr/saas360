@@ -412,7 +412,9 @@ Use expensive models where quality matters (planning, complex execution) and che
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=gsd-build/GSD-2&type=Date)](https://star-history.com/#gsd-build/GSD-2&Date)
+<a href="https://star-history.com/#gsd-build/gsd-2&Date">
+  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=gsd-build/gsd-2&type=Date" />
+</a>
 
 ---
 
