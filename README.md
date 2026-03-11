@@ -1,6 +1,6 @@
 <div align="center">
 
-# GSD
+# GSD 2
 
 **The evolution of [Get Shit Done](https://github.com/glittercowboy/get-shit-done) — now a real coding agent.**
 
