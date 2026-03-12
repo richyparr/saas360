@@ -6,6 +6,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.3.9] - 2026-03-12
+
+### Added
+- Tavily as alternative web search provider alongside Brave Search (#102)
+- Auto-mode progress widget now shows all stats; footer hidden during auto-mode (#75)
+
+### Fixed
+- Auto-mode infinite loop and closeout instability — idempotent unit dispatch, retry caps, and atomic closeout (#96, #109)
+- Migration no longer requires ROADMAP.md — milestones inferred from phases/ directory when missing (#93, #90)
+- Worktree branch safety — proper namespacing and slice branch base selection (#92)
+- Windows: use `execFile` to avoid single-quote shell issues (#103)
+- Broken `read @GSD-WORKFLOW.md` references replaced with `/gsd` command (#88)
+- Google Search extension updated to use `gemini-2.5-flash` (#83)
+- Duplicate `getCurrentBranch` import in auto.ts (#87)
+- `formatCost` crash on non-number cost values (#74)
+- Avoid `sudo` prompts in postinstall script (#73)
+- `.gsd/` folder removed from git tracking; consolidated `.gitignore` (#78)
+- Multiple community-reported bugs across CLI, auto-mode, and extensions
+
 ## [2.3.8] - 2026-03-11
 
 ### Fixed
@@ -157,6 +176,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - License updated to MIT
 
 [Unreleased]: https://github.com/gsd-build/gsd-2/compare/v2.3.8...HEAD
+[2.3.9]: https://github.com/gsd-build/gsd-2/compare/v2.3.8...v2.3.9
 [2.3.8]: https://github.com/gsd-build/gsd-2/compare/v2.3.7...v2.3.8
 [2.3.7]: https://github.com/gsd-build/gsd-2/compare/v2.3.6...v2.3.7
 [2.3.6]: https://github.com/gsd-build/gsd-2/compare/v2.3.5...v2.3.6
