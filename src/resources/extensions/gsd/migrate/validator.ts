@@ -28,7 +28,11 @@ export async function validatePlanningDirectory(path: string): Promise<Validatio
 
   // ROADMAP.md is required (fatal if missing)
   if (!existsSync(join(path, 'ROADMAP.md'))) {
-    issues.push(issue('ROADMAP.md', 'fatal', 'ROADMAP.md is required for migration'));
+    issues.push(issue('ROADMAP.md', 'fatal',
+      `ROADMAP.md is required for migration (expected at ${join(path, 'ROADMAP.md')}). ` +
+      'Migration converts a .planning/ directory into .gsd/ format. ' +
+      'If you are starting fresh, use /gsd:new-project instead.',
+    ));
   }
 
   // Optional files — warn if missing

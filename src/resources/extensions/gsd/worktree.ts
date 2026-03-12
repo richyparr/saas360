@@ -84,6 +84,15 @@ export function ensureSliceBranch(basePath: string, milestoneId: string, sliceId
   if (!branchExists(basePath, branch)) {
     runGit(basePath, ["branch", branch, mainBranch]);
     created = true;
+  } else {
+    // Check if the branch is already checked out in another worktree
+    const worktreeList = runGit(basePath, ["worktree", "list", "--porcelain"]);
+    if (worktreeList.includes(`branch refs/heads/${branch}`)) {
+      throw new Error(
+        `Branch "${branch}" is already in use by another worktree. ` +
+        `Remove that worktree first, or switch it to a different branch.`,
+      );
+    }
   }
 
   // Auto-commit dirty files before checkout to prevent "would be overwritten" errors.

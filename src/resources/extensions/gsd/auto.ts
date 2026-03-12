@@ -78,10 +78,12 @@ let verbose = false;
 let cmdCtx: ExtensionCommandContext | null = null;
 let basePath = "";
 
-/** Track last dispatched unit to detect stuck loops */
+/** Track dispatched units to detect stuck loops (including alternating patterns) */
 let lastUnit: { type: string; id: string } | null = null;
 let retryCount = 0;
 const MAX_RETRIES = 1;
+const unitDispatchCount = new Map<string, number>();
+const MAX_UNIT_DISPATCHES = 3;
 
 /** Crash recovery prompt — set by startAuto, consumed by first dispatchNextUnit */
 let pendingCrashRecovery: string | null = null;
@@ -360,6 +362,7 @@ export async function startAuto(
   basePath = base;
   lastUnit = null;
   retryCount = 0;
+  unitDispatchCount.clear();
   autoStartTime = Date.now();
   completedUnits = [];
   currentUnit = null;
@@ -992,9 +995,18 @@ async function dispatchNextUnit(
   // can perform the UAT manually. On next resume, result file will exist → skip.
   let pauseAfterUatDispatch = false;
 
+  // ── Phase-first dispatch: complete-slice MUST run before reassessment ──
+  // If the current phase is "summarizing", complete-slice is responsible for
+  // mergeSliceToMain. Reassessment must wait until the merge is done.
+  if (state.phase === "summarizing") {
+    const sid = state.activeSlice!.id;
+    const sTitle = state.activeSlice!.title;
+    unitType = "complete-slice";
+    unitId = `${mid}/${sid}`;
+    prompt = await buildCompleteSlicePrompt(mid, midTitle!, sid, sTitle, basePath);
+  } else {
   // ── Adaptive Replanning: check if last completed slice needs reassessment ──
-  // After a slice completes, we reassess the roadmap before moving to the next slice.
-  // Skip reassessment for the final slice (milestone complete) or if already assessed.
+  // Computed here (after summarizing guard) so complete-slice always runs first.
   const needsReassess = await checkNeedsReassessment(basePath, mid, state);
   if (needsRunUat) {
     const { sliceId, uatType } = needsRunUat;
@@ -1075,14 +1087,6 @@ async function dispatchNextUnit(
     unitId = `${mid}/${sid}/${tid}`;
     prompt = await buildExecuteTaskPrompt(mid, sid, sTitle, tid, tTitle, basePath);
 
-  } else if (state.phase === "summarizing") {
-    // All tasks done — complete the slice
-    const sid = state.activeSlice!.id;
-    const sTitle = state.activeSlice!.title;
-    unitType = "complete-slice";
-    unitId = `${mid}/${sid}`;
-    prompt = await buildCompleteSlicePrompt(mid, midTitle!, sid, sTitle, basePath);
-
   } else if (state.phase === "completing-milestone") {
     // All slices done — complete the milestone
     unitType = "complete-milestone";
@@ -1099,12 +1103,33 @@ async function dispatchNextUnit(
     ctx.ui.notify(`Unexpected phase: ${state.phase}. Stopping auto-mode.`, "warning");
     return;
   }
+  } // close outer else block (summarizing guard)
 
   await emitObservabilityWarnings(ctx, unitType, unitId);
 
-  // Stuck detection — same unit dispatched again means the LLM didn't produce
-  // the expected artifact. Retry once (the LLM may have hit an error or run out
-  // of context), then stop with a diagnostic.
+  // Stuck detection — catches both consecutive repeats and alternating patterns.
+  // Consecutive: same unit dispatched back-to-back (LLM didn't produce artifact).
+  // Alternating: same unit dispatched N times total (A→B→A→B loop).
+  const dispatchKey = `${unitType}/${unitId}`;
+  const prevTotalCount = unitDispatchCount.get(dispatchKey) ?? 0;
+
+  if (prevTotalCount >= MAX_UNIT_DISPATCHES) {
+    if (currentUnit) {
+      const modelId = ctx.model?.id ?? "unknown";
+      snapshotUnitMetrics(ctx, currentUnit.type, currentUnit.id, currentUnit.startedAt, modelId);
+    }
+    saveActivityLog(ctx, basePath, unitType, unitId);
+    const expected = diagnoseExpectedArtifact(unitType, unitId, basePath);
+    await stopAuto(ctx, pi);
+    ctx.ui.notify(
+      `Loop detected: ${unitType} ${unitId} dispatched ${prevTotalCount + 1} times. ` +
+      `Check branch state and .gsd/ artifacts.${expected ? `\n   Expected: ${expected}` : ""}`,
+      "error",
+    );
+    return;
+  }
+  unitDispatchCount.set(dispatchKey, prevTotalCount + 1);
+
   if (lastUnit && lastUnit.type === unitType && lastUnit.id === unitId) {
     retryCount++;
 
