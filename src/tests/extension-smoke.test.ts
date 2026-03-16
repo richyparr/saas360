@@ -39,7 +39,7 @@ test("all bundled extensions can be imported without throwing", async () => {
 
   for (const entryPath of entryPaths) {
     const relPath = entryPath.slice(extensionsDir.length + 1);
-    const extName = relPath.split("/")[0].replace(/\.ts$/, "");
+    const extName = relPath.split(/[/\\]/)[0].replace(/\.ts$/, "");
 
     if (SKIP_EXTENSIONS.has(extName)) {
       skipped++;
