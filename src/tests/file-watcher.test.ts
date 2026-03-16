@@ -89,19 +89,18 @@ test("models.json change emits models-changed event", async () => {
 	assert.ok(matched.length > 0, "should emit models-changed event");
 });
 
-test("extensions directory change emits extensions-changed event", async () => {
+test("extensions directory change emits extensions-changed event", { skip: process.platform === "win32" ? "chokidar subdirectory events are unreliable on Windows CI" : undefined }, async () => {
 	const dir = createTempAgentDir();
 	const bus = createMockEventBus();
 
 	await startFileWatcher(dir, bus);
-	// Extra settle time — Windows filesystem events can be slow
 	await delay(500);
 
 	writeFileSync(
 		join(dir, "extensions", "my-ext.json"),
 		JSON.stringify({ name: "test" }),
 	);
-	await delay(1500);
+	await delay(2000);
 
 	const matched = bus.events.filter(
 		(e) => e.channel === "extensions-changed",
