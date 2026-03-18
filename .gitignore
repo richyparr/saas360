@@ -12,8 +12,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.code-workspace
-.env
-.env.*
 !.env.example
 node_modules/
 .next/
@@ -72,3 +70,4 @@ docs/coherence-audit/
 # ── Stale lock files (npm is canonical) ──
 pnpm-lock.yaml
 bun.lock
+config.bat

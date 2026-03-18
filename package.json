@@ -1,7 +1,7 @@
 {
   "name": "gsd-pi",
   "version": "2.28.0",
-  "description": "GSD — Get Shit Done coding agent",
+  "description": "GSD \u2014 Get Shit Done coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -64,7 +64,7 @@
     "sync-platform-versions": "node native/scripts/sync-platform-versions.cjs",
     "validate-pack": "node scripts/validate-pack.js",
     "typecheck:extensions": "tsc --noEmit --project tsconfig.extensions.json",
-    "prepublishOnly": "npm run sync-pkg-version && npm run sync-platform-versions && git diff --exit-code || (echo 'ERROR: version sync changed files — commit them before publishing' && exit 1) && npm run build && npm run typecheck:extensions && npm run validate-pack"
+    "prepublishOnly": "npm run sync-pkg-version && npm run sync-platform-versions && git diff --exit-code || (echo 'ERROR: version sync changed files \u2014 commit them before publishing' && exit 1) && npm run build && npm run typecheck:extensions && npm run validate-pack"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.73.0",
@@ -83,6 +83,7 @@
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
     "diff": "^8.0.2",
+    "dotenv": "^8.2.0",
     "extract-zip": "^2.0.1",
     "file-type": "^21.1.1",
     "get-east-asian-width": "^1.3.0",
@@ -92,6 +93,7 @@
     "marked": "^15.0.12",
     "mime-types": "^3.0.1",
     "minimatch": "^10.2.3",
+    "node-fetch": "^3.3.2",
     "openai": "^6.26.0",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.3",
